@@ -504,7 +504,7 @@ window.initApp=function(){
   if(window._localDark!==undefined) dark=window._localDark;
   applyTheme();renderAll();
 };
-function f(n){return Number(n).toLocaleString("ar-SA",{minimumFractionDigits:0,maximumFractionDigits:2});}
+function f(n){return Number(n).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:2});}
 function gc(id){return CATS.find(c=>c.id===id)||CATS[CATS.length-1];}
 function getF(){return exps.filter(e=>{const d=new Date(e.date);return d.getMonth()===fM&&d.getFullYear()===fY;});}
 function getI(){return incs.filter(i=>i.mo===fM&&i.yr===fY).reduce((s,i)=>s+Number(i.a),0);}
