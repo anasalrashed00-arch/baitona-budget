@@ -4,12 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>بيتنا 🏡</title>
-<link rel="manifest" href="/manifest.json"/>
 <meta name="theme-color" content="#F97316"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="بيتنا"/>
-<script>if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");</script>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module">
@@ -58,17 +54,20 @@ async function loadFromFirestore(uid){
 }
  
 // ── Save to Firestore ──
-window.saveToFirestore = function(){
+window.saveToFirestore = async function(){
   if(!currentUser) return;
-  const data={
-    exps: window._localExps||[],
-    incs: window._localIncs||[],
-    sav:  window._localSav||{bal:0,hist:[]},
-    goal: window._localGoal||null,
-    dark: window._localDark!==undefined ? window._localDark : true,
-    updatedAt: new Date().toISOString()
-  };
-  setDoc(doc(db,"users",currentUser.uid),data).catch(e=>console.error("Save error:",e));
+  try{
+    await setDoc(doc(db,"users",currentUser.uid),{
+      exps: window._localExps||[],
+      incs: window._localIncs||[],
+      sav:  window._localSav||{bal:0,hist:[]},
+      goal: window._localGoal||null,
+      dark: window._localDark!==undefined ? window._localDark : true,
+      updatedAt: new Date().toISOString()
+    });
+  }catch(e){
+    console.error("Save error:",e);
+  }
 };
  
 // ── Google Sign In ──
@@ -191,6 +190,7 @@ input[type=number]{-moz-appearance:textfield}
   </div>
 </div>
  
+<div id="toast" class="toast hid"></div>
 <div id="appWrap" class="hid">
  
 <!-- ── Delete Sheet ── -->
@@ -480,13 +480,28 @@ let exps=[],incs=[],sav={bal:0,hist:[]},goal=null,dark=true;
 let fM=new Date().getMonth(),fY=2026,editId=null,delT=null,actCat="all",actCh="d",curV="dash",fDirty=false,toastTmr=null;
  
 function sa(){
+  // حفظ محلي فوري كـ backup
+  localStorage.setItem("b_exps",JSON.stringify(exps));
+  localStorage.setItem("b_incs",JSON.stringify(incs));
+  localStorage.setItem("b_sav",JSON.stringify(sav));
+  localStorage.setItem("b_goal",JSON.stringify(goal));
+  localStorage.setItem("b_dark",JSON.stringify(dark));
+  // حفظ Firebase في الخلفية
   window._localExps=exps;window._localIncs=incs;window._localSav=sav;window._localGoal=goal;window._localDark=dark;
   if(window.saveToFirestore) window.saveToFirestore();
 }
  
 window.initApp=function(){
-  exps=window._localExps||[];incs=window._localIncs||[];
-  sav=window._localSav||{bal:0,hist:[]};goal=window._localGoal||null;dark=window._localDark!==undefined?window._localDark:true;
+  // حمّل من localStorage أولاً (فوري)
+  function ld(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}}
+  exps=ld("b_exps",[]);incs=ld("b_incs",[]);
+  sav=ld("b_sav",{bal:0,hist:[]});goal=ld("b_goal",null);dark=ld("b_dark",true);
+  // إذا Firebase عنده بيانات أحدث، استخدمها
+  if(window._localExps&&window._localExps.length>=exps.length) exps=window._localExps;
+  if(window._localIncs&&window._localIncs.length>=incs.length) incs=window._localIncs;
+  if(window._localSav) sav=window._localSav;
+  if(window._localGoal!==undefined) goal=window._localGoal;
+  if(window._localDark!==undefined) dark=window._localDark;
   applyTheme();renderAll();
 };
 function f(n){return Number(n).toLocaleString("ar-SA",{minimumFractionDigits:0,maximumFractionDigits:2});}
@@ -798,3 +813,4 @@ function impJSON(e){
 </script>
 </body>
 </html>
+ 
