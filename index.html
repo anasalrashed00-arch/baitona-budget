@@ -226,7 +226,23 @@ input[type=number]{-moz-appearance:textfield}
     <div class="fs">
       <div><span class="lbl">المبلغ *</span><input id="wd_a" class="inp" type="number" placeholder="0.00"/></div>
       <div><span class="lbl">السبب *</span><input id="wd_r" class="inp" placeholder="مثل: سفر، طوارئ..."/></div>
-      <label style="display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--tx2);font-size:13px"><input type="checkbox" id="wd_exp" style="width:15px;height:15px;accent-color:var(--ac)" onchange="document.getElementById('wd_cat').classList.toggle('hid',!this.checked)"/> أضف كمصروف في الميزانية</label>
+      <div>
+        <span class="lbl">وين يروح المبلغ؟</span>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--sf2);border:1.5px solid var(--bd2);border-radius:var(--rs);padding:11px 13px;transition:border .2s" id="wd_opt_none_lbl">
+            <input type="radio" name="wd_dest" id="wd_opt_none" value="none" checked style="accent-color:var(--ac);width:15px;height:15px" onchange="wdOptChange()"/>
+            <div><p style="font-size:13px;font-weight:700;color:var(--tx)">سحب فقط</p><p style="font-size:11px;color:var(--tx3)">يُسحب من الصندوق بدون تأثير على الميزانية</p></div>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--sf2);border:1.5px solid var(--bd2);border-radius:var(--rs);padding:11px 13px;transition:border .2s" id="wd_opt_inc_lbl">
+            <input type="radio" name="wd_dest" id="wd_opt_inc" value="income" style="accent-color:var(--ac);width:15px;height:15px" onchange="wdOptChange()"/>
+            <div><p style="font-size:13px;font-weight:700;color:var(--gr)">✅ أضفه للمتبقي</p><p style="font-size:11px;color:var(--tx3)">يُضاف كدخل إضافي يرفع الميزانية الشهرية</p></div>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--sf2);border:1.5px solid var(--bd2);border-radius:var(--rs);padding:11px 13px;transition:border .2s" id="wd_opt_exp_lbl">
+            <input type="radio" name="wd_dest" id="wd_opt_exp" value="expense" style="accent-color:var(--ac);width:15px;height:15px" onchange="wdOptChange()"/>
+            <div><p style="font-size:13px;font-weight:700;color:var(--ac)">📋 أضفه كمصروف</p><p style="font-size:11px;color:var(--tx3)">يُسجّل كمصروف يُخصم من الميزانية</p></div>
+          </label>
+        </div>
+      </div>
       <div id="wd_cat" class="hid"><span class="lbl">الفئة</span><select id="wd_c" class="inp"><option value="food">🛒 مأكل ومشرب</option><option value="rent">🏠 إيجار</option><option value="electricity">💡 كهرباء</option><option value="transport">🚗 مواصلات</option><option value="health">💊 صحة</option><option value="education">📚 تعليم</option><option value="entertainment">🎮 ترفيه</option><option value="other">📦 أخرى</option></select></div>
       <button class="btn bp" onclick="doWithdraw()">تأكيد السحب</button>
       <button class="btn bg" onclick="cs('sWd')">إلغاء</button>
@@ -650,7 +666,7 @@ function renderAll(){
   // ── Income view ──
   const mIncs=incs.filter(i=>i.mo===fM&&i.yr===fY);
   document.getElementById("iTotal").textContent=inc>0?`الإجمالي: ${f(inc)} ﷼`:"";
-  document.getElementById("iList").innerHTML=mIncs.length?mIncs.map(i=>`<div class="rw" style="margin-bottom:6px"><div style="width:32px;height:32px;border-radius:7px;background:var(--grd);display:flex;align-items:center;justify-content:center;font-size:14px">💰</div><div style="flex:1"><p style="font-weight:700;font-size:13px">${i.t}${i.prevDay?` <span style="font-size:9px;color:var(--tx3);text-decoration:line-through;margin-left:2px">يوم ${i.prevDay}</span> ❌`:""} ${i.day?`<span style="font-size:9px;color:var(--bl);background:#3b82f622;padding:1px 6px;border-radius:4px">يوم ${i.day}</span>`:""}</p></div><p style="font-weight:800;font-size:13px;color:var(--gr);margin-left:7px">${f(i.a)} ﷼</p><button class="bi" onclick="editInc(${i.id})">✏️</button><button class="bi" onclick="delInc(${i.id})">🗑️</button></div>`).join(""):`<div style="text-align:center;padding:26px;color:var(--tx4)"><p style="font-size:24px;margin-bottom:5px">💸</p><p style="font-size:12px">لا توجد مصادر دخل</p></div>`;
+  document.getElementById("iList").innerHTML=mIncs.length?mIncs.map(i=>`<div class="rw" style="margin-bottom:6px"><div style="width:32px;height:32px;border-radius:7px;background:${i.fromSavings?"var(--acg)":"var(--grd)"};display:flex;align-items:center;justify-content:center;font-size:14px">${i.fromSavings?"🏦":"💰"}</div><div style="flex:1"><p style="font-weight:700;font-size:13px">${i.t}${i.fromSavings?` <span style="font-size:9px;color:var(--ac);background:var(--acg);padding:1px 6px;border-radius:4px">من الصندوق</span>`:""}${i.prevDay?` <span style="font-size:9px;color:var(--tx3);text-decoration:line-through;margin-left:2px">يوم ${i.prevDay}</span> ❌`:""} ${i.day?`<span style="font-size:9px;color:var(--bl);background:#3b82f622;padding:1px 6px;border-radius:4px">يوم ${i.day}</span>`:""}</p></div><p style="font-weight:800;font-size:13px;color:var(--gr);margin-left:7px">${f(i.a)} ﷼</p><button class="bi" onclick="editInc(${i.id})">✏️</button><button class="bi" onclick="delInc(${i.id})">🗑️</button></div>`).join(""):`<div style="text-align:center;padding:26px;color:var(--tx4)"><p style="font-size:24px;margin-bottom:5px">💸</p><p style="font-size:12px">لا توجد مصادر دخل</p></div>`;
   if(mIncs.length){
     const net2=inc-tot,sp=inc>0?Math.min((net2/inc)*100,100):0;
     document.getElementById("iSum").classList.remove("hid");
@@ -671,7 +687,7 @@ function renderSav(){
   const td=hist.filter(t=>t.tp==="d").reduce((s,t)=>s+t.a,0),tw=hist.filter(t=>t.tp==="w").reduce((s,t)=>s+t.a,0);
   document.getElementById("sv_b").textContent=f(bal);document.getElementById("sv_td").textContent=f(td);document.getElementById("sv_tw").textContent=f(tw);document.getElementById("sv_tc").textContent=hist.length+" معاملة";
   if(goal&&goal.tg>0){document.getElementById("sv_gw").classList.remove("hid");const gp=Math.min((bal/goal.tg)*100,100);document.getElementById("sv_gn").textContent=`هدف: ${goal.nm||"توفير"}`;document.getElementById("sv_gp").textContent=Math.round(gp)+"%";document.getElementById("sv_gb").style.width=gp+"%";document.getElementById("sv_gd").textContent=`${f(bal)} من ${f(goal.tg)} ﷼`;}else{document.getElementById("sv_gw").classList.add("hid");}
-  document.getElementById("sv_h").innerHTML=!hist.length?`<div style="text-align:center;padding:34px;color:var(--tx4)"><p style="font-size:24px;margin-bottom:5px">🏦</p><p style="font-size:12px">لا توجد معاملات بعد</p></div>`:[...hist].reverse().map(t=>`<div class="rw" style="margin-bottom:6px"><div style="width:34px;height:34px;border-radius:8px;background:${t.tp==="d"?"var(--grd)":"var(--rdd)"};display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${t.tp==="d"?"⬆️":"⬇️"}</div><div style="flex:1;min-width:0"><p style="font-weight:700;font-size:13px">${t.rsn||t.src||"—"}${t.lnk?` <span style="font-size:9px;color:var(--yw);background:var(--ywd);padding:1px 5px;border-radius:3px">مصروف</span>`:""}${t.fromIncome?` <span style="font-size:9px;color:var(--gr);background:var(--grd);padding:1px 5px;border-radius:3px">من الدخل</span>`:""}</p><p style="font-size:11px;color:var(--tx3);margin-top:1px">${t.dt}${t.nt?` · ${t.nt}`:""}</p></div><p style="font-weight:800;font-size:13px;color:${t.tp==="d"?"var(--gr)":"var(--rd)"};flex-shrink:0">${t.tp==="d"?"+":"−"}${f(t.a)} ﷼</p><div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0"><button class="bi" onclick="openTxEdit(${t.id})">✏️</button><button class="bi" onclick="askTxDel(${t.id})">🗑️</button></div></div>`).join("");
+  document.getElementById("sv_h").innerHTML=!hist.length?`<div style="text-align:center;padding:34px;color:var(--tx4)"><p style="font-size:24px;margin-bottom:5px">🏦</p><p style="font-size:12px">لا توجد معاملات بعد</p></div>`:[...hist].reverse().map(t=>`<div class="rw" style="margin-bottom:6px"><div style="width:34px;height:34px;border-radius:8px;background:${t.tp==="d"?"var(--grd)":"var(--rdd)"};display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${t.tp==="d"?"⬆️":"⬇️"}</div><div style="flex:1;min-width:0"><p style="font-weight:700;font-size:13px">${t.rsn||t.src||"—"}${t.lnk?` <span style="font-size:9px;color:var(--yw);background:var(--ywd);padding:1px 5px;border-radius:3px">مصروف</span>`:""}${t.fromIncome?` <span style="font-size:9px;color:var(--gr);background:var(--grd);padding:1px 5px;border-radius:3px">من الدخل</span>`:""}${t.toIncome?` <span style="font-size:9px;color:var(--gr);background:var(--grd);padding:1px 5px;border-radius:3px">للمتبقي ✅</span>`:""}</p><p style="font-size:11px;color:var(--tx3);margin-top:1px">${t.dt}${t.nt?` · ${t.nt}`:""}</p></div><p style="font-weight:800;font-size:13px;color:${t.tp==="d"?"var(--gr)":"var(--rd)"};flex-shrink:0">${t.tp==="d"?"+":"−"}${f(t.a)} ﷼</p><div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0"><button class="bi" onclick="openTxEdit(${t.id})">✏️</button><button class="bi" onclick="askTxDel(${t.id})">🗑️</button></div></div>`).join("");
 }
  
 function addInc(){
@@ -737,17 +753,37 @@ function doDeposit(){
   document.getElementById("dp_a").value="";document.getElementById("dp_s").value="";document.getElementById("dp_n").value="";document.getElementById("dp_fromInc").checked=false;
   sa();cs("sDp");renderAll();toast("تم الإيداع ✓");submitting=false;
 }
+function wdOptChange(){
+  const val=document.querySelector('input[name="wd_dest"]:checked').value;
+  document.getElementById("wd_cat").classList.toggle("hid",val!=="expense");
+  // highlight selected option
+  ["none","inc","exp"].forEach(k=>{
+    const lbl=document.getElementById("wd_opt_"+k+"_lbl");
+    if(lbl) lbl.style.borderColor=document.getElementById("wd_opt_"+k).checked?"var(--ac)":"var(--bd2)";
+  });
+}
 function doWithdraw(){
   if(submitting) return;submitting=true;
-  const a=Number(document.getElementById("wd_a").value),rsn=document.getElementById("wd_r").value.trim(),addE=document.getElementById("wd_exp").checked,cat=document.getElementById("wd_c").value;
+  const a=Number(document.getElementById("wd_a").value),rsn=document.getElementById("wd_r").value.trim();
+  const dest=document.querySelector('input[name="wd_dest"]:checked').value;
+  const cat=document.getElementById("wd_c").value;
   if(!a||a<=0){toast("أدخل مبلغاً صحيحاً","err");submitting=false;return;}
   if(a>(sav.bal||0)){toast(`الرصيد غير كافٍ — رصيدك: ${f(sav.bal||0)} ﷼`,"err");submitting=false;return;}
   if(!rsn){toast("أدخل سبب السحب","err");submitting=false;return;}
   sav.bal=(sav.bal||0)-a;
-  sav.hist.push({id:Date.now(),tp:"w",a,rsn,dt:new Date().toISOString().split("T")[0],lnk:addE});
-  if(addE){exps.unshift({id:Date.now()+1,t:`سحب من الصندوق: ${rsn}`,a,cat,date:new Date().toISOString().split("T")[0],n:"من صندوق التوفير",rec:false});}
-  document.getElementById("wd_a").value="";document.getElementById("wd_r").value="";document.getElementById("wd_exp").checked=false;document.getElementById("wd_cat").classList.add("hid");
-  sa();cs("sWd");renderAll();toast("تم السحب ✓");submitting=false;
+  const addE=dest==="expense", toInc=dest==="income";
+  sav.hist.push({id:Date.now(),tp:"w",a,rsn,dt:new Date().toISOString().split("T")[0],lnk:addE,toIncome:toInc});
+  if(addE){
+    exps.unshift({id:Date.now()+1,t:`سحب من الصندوق: ${rsn}`,a,cat,date:new Date().toISOString().split("T")[0],n:"من صندوق التوفير",rec:false});
+  }
+  if(toInc){
+    incs.push({id:Date.now()+2,t:`من الصندوق: ${rsn}`,a,mo:fM,yr:fY,day:null,fromSavings:true});
+  }
+  document.getElementById("wd_a").value="";document.getElementById("wd_r").value="";
+  document.querySelector('input[name="wd_dest"][value="none"]').checked=true;wdOptChange();
+  sa();cs("sWd");renderAll();
+  toast(toInc?"تم السحب وأُضيف للمتبقي ✓":addE?"تم السحب وسُجّل كمصروف ✓":"تم السحب ✓");
+  submitting=false;
 }
 function saveGoal(){const n=document.getElementById("gl_n").value.trim(),t=Number(document.getElementById("gl_t").value);if(t>0)goal={nm:n||"توفير",tg:t};sa();cs("sGoal");renderSav();toast("تم حفظ الهدف ✓");}
 function clearGoal(){goal=null;sa();cs("sGoal");renderSav();toast("تم مسح الهدف");}
@@ -813,4 +849,5 @@ function impJSON(e){
 </script>
 </body>
 </html>
+ 
  
