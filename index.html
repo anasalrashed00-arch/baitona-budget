@@ -49,6 +49,13 @@ async function loadFromFirestore(uid){
       if(d.sav)  window._sav  = d.sav;
       if(d.goal !== undefined) window._goal = d.goal;
       if(d.dark !== undefined) window._dark = d.dark;
+      if(d.updatedAt) window._updatedAt = d.updatedAt;
+      // mirror to _local vars
+      window._localExps=d.exps||[];
+      window._localIncs=d.incs||[];
+      window._localSav=d.sav||{bal:0,hist:[]};
+      window._localGoal=d.goal||null;
+      window._localDark=d.dark!==undefined?d.dark:true;
     }
   }catch(e){console.error("Load error:",e);}
 }
@@ -93,12 +100,6 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("userAvatar").src = user.photoURL || "";
     document.getElementById("userAvatar").classList.toggle("hid", !user.photoURL);
     await loadFromFirestore(user.uid);
-    // Push loaded data to local variables
-    if(window._exps !== undefined) window._localExps = window._exps;
-    if(window._incs !== undefined) window._localIncs = window._incs;
-    if(window._sav  !== undefined) window._localSav  = window._sav;
-    if(window._goal !== undefined) window._localGoal = window._goal;
-    if(window._dark !== undefined) window._localDark = window._dark;
     hideAuthScreen();
     if(window.initApp) window.initApp();
   } else {
@@ -192,6 +193,16 @@ input[type=number]{-moz-appearance:textfield}
  
 <div id="toast" class="toast hid"></div>
 <div id="appWrap" class="hid">
+ 
+<!-- ── Income Delete Sheet ── -->
+<div id="sIncDel" class="ov hid" onclick="if(event.target===this)cs('sIncDel')">
+  <div class="sh">
+    <div class="sh-h"></div>
+    <p style="font-size:16px;font-weight:800;margin-bottom:6px">حذف مصدر الدخل؟</p>
+    <p style="color:var(--tx2);font-size:13px;margin-bottom:20px">هذا الإجراء لا يمكن التراجع عنه</p>
+    <div style="display:flex;gap:9px"><button class="btn bd-btn" onclick="confirmIncDel()">حذف</button><button class="btn bg" style="flex:1" onclick="cs('sIncDel')">إلغاء</button></div>
+  </div>
+</div>
  
 <!-- ── Delete Sheet ── -->
 <div id="sDelete" class="ov hid" onclick="if(event.target===this)cs('sDelete')">
@@ -490,18 +501,21 @@ input[type=number]{-moz-appearance:textfield}
 <script>
 const CATS=[{id:"food",lb:"🛒 مأكل ومشرب",cl:"#F97316"},{id:"rent",lb:"🏠 إيجار / رهن",cl:"#3B82F6"},{id:"electricity",lb:"💡 كهرباء ومياه",cl:"#EAB308"},{id:"transport",lb:"🚗 مواصلات",cl:"#10B981"},{id:"health",lb:"💊 صحة وطب",cl:"#EC4899"},{id:"education",lb:"📚 تعليم",cl:"#8B5CF6"},{id:"entertainment",lb:"🎮 ترفيه",cl:"#06B6D4"},{id:"other",lb:"📦 أخرى",cl:"#6B7280"}];
 const MO=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-const YRS=[2026,2027,2028,2029,2030];
+const _cy=new Date().getFullYear();
+const YRS=Array.from({length:8},(_,i)=>_cy-2+i);
  
 let exps=[],incs=[],sav={bal:0,hist:[]},goal=null,dark=true;
-let fM=new Date().getMonth(),fY=2026,editId=null,delT=null,actCat="all",actCh="d",curV="dash",fDirty=false,toastTmr=null;
+let fM=new Date().getMonth(),fY=new Date().getFullYear(),editId=null,delT=null,actCat="all",actCh="d",curV="dash",fDirty=false,toastTmr=null;
  
 function sa(){
+  const ts=Date.now();
   // حفظ محلي فوري كـ backup
   localStorage.setItem("b_exps",JSON.stringify(exps));
   localStorage.setItem("b_incs",JSON.stringify(incs));
   localStorage.setItem("b_sav",JSON.stringify(sav));
   localStorage.setItem("b_goal",JSON.stringify(goal));
   localStorage.setItem("b_dark",JSON.stringify(dark));
+  localStorage.setItem("b_updatedAt",ts);
   // حفظ Firebase في الخلفية
   window._localExps=exps;window._localIncs=incs;window._localSav=sav;window._localGoal=goal;window._localDark=dark;
   if(window.saveToFirestore) window.saveToFirestore();
@@ -512,18 +526,24 @@ window.initApp=function(){
   function ld(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}}
   exps=ld("b_exps",[]);incs=ld("b_incs",[]);
   sav=ld("b_sav",{bal:0,hist:[]});goal=ld("b_goal",null);dark=ld("b_dark",true);
-  // إذا Firebase عنده بيانات أحدث، استخدمها
-  if(window._localExps&&window._localExps.length>=exps.length) exps=window._localExps;
-  if(window._localIncs&&window._localIncs.length>=incs.length) incs=window._localIncs;
-  if(window._localSav) sav=window._localSav;
-  if(window._localGoal!==undefined) goal=window._localGoal;
-  if(window._localDark!==undefined) dark=window._localDark;
+  const localTs=ld("b_updatedAt",0);
+  // إذا Firebase عنده بيانات أحدث (بناءً على timestamp)، استخدمها
+  const firebaseTs=window._updatedAt?new Date(window._updatedAt).getTime():0;
+  if(firebaseTs>localTs){
+    if(window._localExps!==undefined) exps=window._localExps;
+    if(window._localIncs!==undefined) incs=window._localIncs;
+    if(window._localSav!==undefined) sav=window._localSav;
+    if(window._localGoal!==undefined) goal=window._localGoal;
+    if(window._localDark!==undefined) dark=window._localDark;
+  }
   applyTheme();renderAll();
 };
 function f(n){return Number(n).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:2});}
 function gc(id){return CATS.find(c=>c.id===id)||CATS[CATS.length-1];}
 function getF(){return exps.filter(e=>{const d=new Date(e.date);return d.getMonth()===fM&&d.getFullYear()===fY;});}
 function getI(){return incs.filter(i=>i.mo===fM&&i.yr===fY).reduce((s,i)=>s+Number(i.a),0);}
+function getIRegular(){return incs.filter(i=>i.mo===fM&&i.yr===fY&&!i.fromSavings).reduce((s,i)=>s+Number(i.a),0);}
+function getISavings(){return incs.filter(i=>i.mo===fM&&i.yr===fY&&i.fromSavings).reduce((s,i)=>s+Number(i.a),0);}
  
 function applyTheme(){document.body.classList.toggle("lm",!dark);document.getElementById("tbtn").textContent=dark?"🌙":"☀️";setTimeout(()=>drawD(cdData()),150);}
 function toggleTheme(){dark=!dark;sa();applyTheme();}
@@ -665,12 +685,13 @@ function renderAll(){
  
   // ── Income view ──
   const mIncs=incs.filter(i=>i.mo===fM&&i.yr===fY);
+  const incSav=getISavings();
   document.getElementById("iTotal").textContent=inc>0?`الإجمالي: ${f(inc)} ﷼`:"";
   document.getElementById("iList").innerHTML=mIncs.length?mIncs.map(i=>`<div class="rw" style="margin-bottom:6px"><div style="width:32px;height:32px;border-radius:7px;background:${i.fromSavings?"var(--acg)":"var(--grd)"};display:flex;align-items:center;justify-content:center;font-size:14px">${i.fromSavings?"🏦":"💰"}</div><div style="flex:1"><p style="font-weight:700;font-size:13px">${i.t}${i.fromSavings?` <span style="font-size:9px;color:var(--ac);background:var(--acg);padding:1px 6px;border-radius:4px">من الصندوق</span>`:""}${i.prevDay?` <span style="font-size:9px;color:var(--tx3);text-decoration:line-through;margin-left:2px">يوم ${i.prevDay}</span> ❌`:""} ${i.day?`<span style="font-size:9px;color:var(--bl);background:#3b82f622;padding:1px 6px;border-radius:4px">يوم ${i.day}</span>`:""}</p></div><p style="font-weight:800;font-size:13px;color:var(--gr);margin-left:7px">${f(i.a)} ﷼</p><button class="bi" onclick="editInc(${i.id})">✏️</button><button class="bi" onclick="delInc(${i.id})">🗑️</button></div>`).join(""):`<div style="text-align:center;padding:26px;color:var(--tx4)"><p style="font-size:24px;margin-bottom:5px">💸</p><p style="font-size:12px">لا توجد مصادر دخل</p></div>`;
   if(mIncs.length){
     const net2=inc-tot,sp=inc>0?Math.min((net2/inc)*100,100):0;
     document.getElementById("iSum").classList.remove("hid");
-    document.getElementById("is_i").textContent=f(inc)+" ﷼";
+    document.getElementById("is_i").innerHTML=`${f(inc)} ﷼${incSav>0?` <span style="font-size:10px;color:var(--ac);font-weight:600">(منها ${f(incSav)} من الصندوق)</span>`:""}`;
     document.getElementById("is_e").textContent=f(tot)+" ﷼";
     document.getElementById("is_s").textContent=f(net2)+" ﷼";
     document.getElementById("is_s").style.color=net2>=0?"var(--gr)":"var(--rd)";
@@ -699,8 +720,25 @@ function addInc(){
   document.getElementById("iT").value="";document.getElementById("iA").value="";document.getElementById("iDay").value="";
   sa();renderAll();toast("تمت الإضافة ✓");submitting=false;
 }
-function delInc(id){incs=incs.filter(i=>i.id!==id);sa();renderAll();toast("تم الحذف");}
-function editInc(id){const i=incs.find(x=>x.id===id);if(!i)return;document.getElementById("ie_id").value=id;document.getElementById("ie_t").value=i.t;document.getElementById("ie_a").value=i.a;document.getElementById("ie_day").value=i.day||"";os("sIE");}
+let incDelTarget=null;
+function delInc(id){
+  const i=incs.find(x=>x.id===id);
+  if(!i) return;
+  // منع حذف دخل مرتبط بصندوق مباشرة — يُحذف من الصندوق
+  if(i.fromSavings){toast("لحذف هذا، احذف المعاملة من صندوق التوفير","w");return;}
+  incDelTarget=id;
+  os("sIncDel");
+}
+function confirmIncDel(){
+  if(!incDelTarget){cs("sIncDel");return;}
+  incs=incs.filter(i=>i.id!==incDelTarget);
+  incDelTarget=null;sa();cs("sIncDel");renderAll();toast("تم الحذف");
+}
+function editInc(id){
+  const i=incs.find(x=>x.id===id);if(!i)return;
+  if(i.fromSavings){toast("عدّل هذا المبلغ من سجل الصندوق","w");return;}
+  document.getElementById("ie_id").value=id;document.getElementById("ie_t").value=i.t;document.getElementById("ie_a").value=i.a;document.getElementById("ie_day").value=i.day||"";os("sIE");
+}
 function saveIE(){
   const id=Number(document.getElementById("ie_id").value),t=document.getElementById("ie_t").value.trim(),a=Number(document.getElementById("ie_a").value),day=Number(document.getElementById("ie_day").value)||null;
   if(!t||!a||a<=0){toast("تأكد من البيانات","err");return;}
@@ -733,7 +771,16 @@ function saveTxEdit(){
   else sav.bal=(sav.bal||0)+old.a-newA;
   sav.bal=Math.max(0,sav.bal);
   sav.hist=sav.hist.map(x=>x.id===id?{...x,a:newA,rsn:tp==="w"?newR:x.rsn,src:tp==="d"?newR:x.src,nt:newN}:x);
-  sa();cs("sTxEdit");renderSav();toast("تم التعديل ✓");
+  // حدّث الدخل المرتبط لو السحب كان "للمتبقي"
+  if(tp==="w"&&old.toIncome){
+    const linked=incs.find(i=>i.fromSavings&&i.a===old.a&&i.t.includes(old.rsn));
+    if(linked) incs=incs.map(i=>i.id===linked.id?{...i,a:newA,t:`من الصندوق: ${newR||old.rsn}`}:i);
+  }
+  // حدّث المصروف المرتبط لو السحب كان "كمصروف"
+  if(tp==="w"&&old.lnk){
+    exps=exps.map(e=>(e.n==="من صندوق التوفير"&&e.a===old.a&&e.t.includes(old.rsn))?{...e,a:newA,t:`سحب من الصندوق: ${newR||old.rsn}`}:e);
+  }
+  sa();cs("sTxEdit");renderAll();toast("تم التعديل ✓");
 }
 function askTxDel(id){txDelTarget=id;os("sTxDel");}
 function confirmTxDel(){
@@ -741,8 +788,18 @@ function confirmTxDel(){
   // reverse the transaction from balance
   if(t.tp==="d") sav.bal=Math.max(0,(sav.bal||0)-t.a);
   else sav.bal=(sav.bal||0)+t.a;
+  // لو السحب كان "للمتبقي"، احذف الدخل المرتبط
+  if(t.tp==="w"&&t.toIncome){
+    // نبحث عن دخل fromSavings بنفس المبلغ والسبب قريب من تاريخ المعاملة
+    const linked=incs.find(i=>i.fromSavings&&i.a===t.a&&i.t.includes(t.rsn));
+    if(linked) incs=incs.filter(i=>i.id!==linked.id);
+  }
+  // لو السحب كان "كمصروف"، احذف المصروف المرتبط
+  if(t.tp==="w"&&t.lnk){
+    exps=exps.filter(e=>!(e.n==="من صندوق التوفير"&&e.a===t.a&&e.t.includes(t.rsn)));
+  }
   sav.hist=sav.hist.filter(x=>x.id!==txDelTarget);
-  txDelTarget=null;sa();cs("sTxDel");renderSav();toast("تم الحذف وتم تحديث الرصيد");
+  txDelTarget=null;sa();cs("sTxDel");renderAll();toast("تم الحذف وتم تحديث الرصيد");
 }
  
 function doDeposit(){
@@ -794,6 +851,12 @@ function openAdd(){
   const now=new Date();bldDS(fY,fM,now.getDate());
   document.getElementById("fN").value="";
   document.getElementById("fmTitle").textContent="إضافة مصروف";document.getElementById("fBtn").textContent="✅ إضافة المصروف";
+  // track any change in the form
+  ["fT","fA","fC","fDy","fMo","fYr","fN"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener("input",()=>fDirty=true,{once:false});
+    if(el) el.addEventListener("change",()=>fDirty=true,{once:false});
+  });
   sv("add");
 }
 function startEdit(id){
@@ -802,6 +865,11 @@ function startEdit(id){
   const d=new Date(e.date);bldDS(d.getFullYear(),d.getMonth(),d.getDate());
   document.getElementById("fN").value=e.n||"";
   document.getElementById("fmTitle").textContent="تعديل المصروف";document.getElementById("fBtn").textContent="💾 حفظ التعديلات";
+  ["fT","fA","fC","fDy","fMo","fYr","fN"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener("input",()=>fDirty=true,{once:false});
+    if(el) el.addEventListener("change",()=>fDirty=true,{once:false});
+  });
   sv("add");
 }
 let submitting=false;
@@ -815,8 +883,9 @@ function subForm(){
   fDirty=false;sa();editId=null;submitting=false;sv("dash");
 }
 function goBack(){
-  if(fDirty&&(document.getElementById("fT").value||document.getElementById("fA").value)){if(!confirm("بياناتك غير محفوظة، تبي ترجع؟"))return;}
-  editId=null;sv("dash");
+  const hasContent=document.getElementById("fT").value.trim()||document.getElementById("fA").value;
+  if(fDirty||hasContent){if(!confirm("بياناتك غير محفوظة، تبي ترجع؟"))return;}
+  editId=null;fDirty=false;sv("dash");
 }
 function askDel(id){delT=id;os("sDelete");}
 function confirmDelete(){exps=exps.filter(e=>e.id!==delT);sa();cs("sDelete");toast("تم الحذف");renderAll();}
