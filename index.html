@@ -49,17 +49,11 @@ async function loadFromFirestore(uid){
       if(d.sav)  window._sav  = d.sav;
       if(d.goal !== undefined) window._goal = d.goal;
       if(d.dark !== undefined) window._dark = d.dark;
-      if(d.updatedAt) window._updatedAt = d.updatedAt;
-      // mirror to _local vars
-      window._localExps=d.exps||[];
-      window._localIncs=d.incs||[];
-      window._localSav=d.sav||{bal:0,hist:[]};
-      window._localGoal=d.goal||null;
-      window._localDark=d.dark!==undefined?d.dark:true;
+      if(d.wallets) window._wallets = d.wallets;
     }
   }catch(e){console.error("Load error:",e);}
 }
- 
+
 // ── Save to Firestore ──
 window.saveToFirestore = async function(){
   if(!currentUser) return;
@@ -70,6 +64,7 @@ window.saveToFirestore = async function(){
       sav:  window._localSav||{bal:0,hist:[]},
       goal: window._localGoal||null,
       dark: window._localDark!==undefined ? window._localDark : true,
+      wallets: window._localWallets||[],
       updatedAt: new Date().toISOString()
     });
   }catch(e){
@@ -100,6 +95,13 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("userAvatar").src = user.photoURL || "";
     document.getElementById("userAvatar").classList.toggle("hid", !user.photoURL);
     await loadFromFirestore(user.uid);
+    // Push loaded data to local variables
+    if(window._localExps !== undefined) window._localExps = window._exps;
+    if(window._incs !== undefined) window._localIncs = window._incs;
+    if(window._sav  !== undefined) window._localSav  = window._sav;
+    if(window._goal !== undefined) window._localGoal = window._goal;
+    if(window._dark !== undefined) window._localDark = window._dark;
+    if(window._wallets !== undefined) window._localWallets = window._wallets;
     hideAuthScreen();
     if(window.initApp) window.initApp();
   } else {
@@ -194,13 +196,69 @@ input[type=number]{-moz-appearance:textfield}
 <div id="toast" class="toast hid"></div>
 <div id="appWrap" class="hid">
  
-<!-- ── Income Delete Sheet ── -->
-<div id="sIncDel" class="ov hid" onclick="if(event.target===this)cs('sIncDel')">
+<!-- ── Wallet Add/Edit Sheet ── -->
+<div id="sWal" class="ov hid" onclick="if(event.target===this)cs('sWal')">
   <div class="sh">
     <div class="sh-h"></div>
-    <p style="font-size:16px;font-weight:800;margin-bottom:6px">حذف مصدر الدخل؟</p>
-    <p style="color:var(--tx2);font-size:13px;margin-bottom:20px">هذا الإجراء لا يمكن التراجع عنه</p>
-    <div style="display:flex;gap:9px"><button class="btn bd-btn" onclick="confirmIncDel()">حذف</button><button class="btn bg" style="flex:1" onclick="cs('sIncDel')">إلغاء</button></div>
+    <p id="walShTitle" style="font-size:16px;font-weight:800;margin-bottom:16px">💳 إضافة محفظة</p>
+    <input type="hidden" id="wal_id"/>
+    <div class="fs">
+      <div>
+        <span class="lbl">اسم البنك *</span>
+        <input id="wal_bank" class="inp" placeholder="مثل: بنك الراجحي، الأهلي..."/>
+      </div>
+      <div>
+        <span class="lbl">اسم صاحب الحساب</span>
+        <input id="wal_name" class="inp" placeholder="الاسم الكامل"/>
+      </div>
+      <div>
+        <span class="lbl">رقم الحساب</span>
+        <input id="wal_acc" class="inp" placeholder="xxxxxxxxxxxx" style="direction:ltr;text-align:right"/>
+      </div>
+      <div>
+        <span class="lbl">رقم الآيبان (IBAN)</span>
+        <input id="wal_iban" class="inp" placeholder="SA00 0000 0000 0000 0000 0000" style="direction:ltr;text-align:right" oninput="fmtIban(this)"/>
+      </div>
+      <div>
+        <span class="lbl">سويفت كود (SWIFT)</span>
+        <input id="wal_swift" class="inp" placeholder="XXXXXXXX" style="direction:ltr;text-align:right" oninput="this.value=this.value.toUpperCase()"/>
+      </div>
+      <div>
+        <span class="lbl">ملاحظة</span>
+        <input id="wal_note" class="inp" placeholder="أي تفاصيل إضافية..."/>
+      </div>
+      <div>
+        <span class="lbl">لون البطاقة</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="walColors">
+          <div class="walClr on" data-c="0" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#F97316,#FB923C);cursor:pointer;border:2px solid transparent" onclick="selClr(this)"></div>
+          <div class="walClr" data-c="1" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3B82F6,#6366F1);cursor:pointer;border:2px solid transparent" onclick="selClr(this)"></div>
+          <div class="walClr" data-c="2" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#10B981,#059669);cursor:pointer;border:2px solid transparent" onclick="selClr(this)"></div>
+          <div class="walClr" data-c="3" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#EC4899,#BE185D);cursor:pointer;border:2px solid transparent" onclick="selClr(this)"></div>
+          <div class="walClr" data-c="4" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#8B5CF6,#7C3AED);cursor:pointer;border:2px solid transparent" onclick="selClr(this)"></div>
+          <div class="walClr" data-c="5" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#1E293B,#334155);cursor:pointer;border:2px solid transparent" onclick="selClr(this)"></div>
+        </div>
+      </div>
+      <button class="btn bp" id="walSaveBtn" onclick="saveWallet()">💾 حفظ المحفظة</button>
+      <button class="btn bg" onclick="cs('sWal')">إلغاء</button>
+    </div>
+  </div>
+</div>
+ 
+<!-- ── Wallet Delete Sheet ── -->
+<div id="sWalDel" class="ov hid" onclick="if(event.target===this)cs('sWalDel')">
+  <div class="sh">
+    <div class="sh-h"></div>
+    <p style="font-size:16px;font-weight:800;margin-bottom:6px">حذف المحفظة؟</p>
+    <p style="color:var(--tx2);font-size:13px;margin-bottom:20px">سيتم حذف جميع بيانات هذه المحفظة</p>
+    <div style="display:flex;gap:9px"><button class="btn bd-btn" onclick="confirmWalDel()">حذف</button><button class="btn bg" style="flex:1" onclick="cs('sWalDel')">إلغاء</button></div>
+  </div>
+</div>
+ 
+<!-- ── Wallet View Sheet ── -->
+<div id="sWalView" class="ov hid" onclick="if(event.target===this)cs('sWalView')">
+  <div class="sh" style="padding-bottom:28px">
+    <div class="sh-h"></div>
+    <div id="walViewContent"></div>
   </div>
 </div>
  
@@ -237,23 +295,7 @@ input[type=number]{-moz-appearance:textfield}
     <div class="fs">
       <div><span class="lbl">المبلغ *</span><input id="wd_a" class="inp" type="number" placeholder="0.00"/></div>
       <div><span class="lbl">السبب *</span><input id="wd_r" class="inp" placeholder="مثل: سفر، طوارئ..."/></div>
-      <div>
-        <span class="lbl">وين يروح المبلغ؟</span>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--sf2);border:1.5px solid var(--bd2);border-radius:var(--rs);padding:11px 13px;transition:border .2s" id="wd_opt_none_lbl">
-            <input type="radio" name="wd_dest" id="wd_opt_none" value="none" checked style="accent-color:var(--ac);width:15px;height:15px" onchange="wdOptChange()"/>
-            <div><p style="font-size:13px;font-weight:700;color:var(--tx)">سحب فقط</p><p style="font-size:11px;color:var(--tx3)">يُسحب من الصندوق بدون تأثير على الميزانية</p></div>
-          </label>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--sf2);border:1.5px solid var(--bd2);border-radius:var(--rs);padding:11px 13px;transition:border .2s" id="wd_opt_inc_lbl">
-            <input type="radio" name="wd_dest" id="wd_opt_inc" value="income" style="accent-color:var(--ac);width:15px;height:15px" onchange="wdOptChange()"/>
-            <div><p style="font-size:13px;font-weight:700;color:var(--gr)">✅ أضفه للمتبقي</p><p style="font-size:11px;color:var(--tx3)">يُضاف كدخل إضافي يرفع الميزانية الشهرية</p></div>
-          </label>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--sf2);border:1.5px solid var(--bd2);border-radius:var(--rs);padding:11px 13px;transition:border .2s" id="wd_opt_exp_lbl">
-            <input type="radio" name="wd_dest" id="wd_opt_exp" value="expense" style="accent-color:var(--ac);width:15px;height:15px" onchange="wdOptChange()"/>
-            <div><p style="font-size:13px;font-weight:700;color:var(--ac)">📋 أضفه كمصروف</p><p style="font-size:11px;color:var(--tx3)">يُسجّل كمصروف يُخصم من الميزانية</p></div>
-          </label>
-        </div>
-      </div>
+      <label style="display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--tx2);font-size:13px"><input type="checkbox" id="wd_exp" style="width:15px;height:15px;accent-color:var(--ac)" onchange="document.getElementById('wd_cat').classList.toggle('hid',!this.checked)"/> أضف كمصروف في الميزانية</label>
       <div id="wd_cat" class="hid"><span class="lbl">الفئة</span><select id="wd_c" class="inp"><option value="food">🛒 مأكل ومشرب</option><option value="rent">🏠 إيجار</option><option value="electricity">💡 كهرباء</option><option value="transport">🚗 مواصلات</option><option value="health">💊 صحة</option><option value="education">📚 تعليم</option><option value="entertainment">🎮 ترفيه</option><option value="other">📦 أخرى</option></select></div>
       <button class="btn bp" onclick="doWithdraw()">تأكيد السحب</button>
       <button class="btn bg" onclick="cs('sWd')">إلغاء</button>
@@ -486,6 +528,22 @@ input[type=number]{-moz-appearance:textfield}
     <div class="card" style="padding:14px;margin-bottom:12px"><p style="font-size:13px;font-weight:700;margin-bottom:11px">الفئات</p><div id="sm_cs"></div></div>
     <div class="card" style="padding:14px"><p style="font-size:13px;font-weight:700;margin-bottom:11px">آخر 6 أشهر</p><div id="sm_tr"></div></div>
   </div>
+
+  <!-- WALLET -->
+  <div id="vWal" class="hid fi">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+      <p style="font-size:16px;font-weight:800">💳 محافظي البنكية</p>
+      <button class="bsm" onclick="openAddWallet()">+ إضافة</button>
+    </div>
+    <p style="font-size:12px;color:var(--tx3);margin-bottom:14px">بياناتك البنكية المحفوظة بأمان على حسابك</p>
+    <div id="walList"></div>
+    <div id="walEmpty" style="text-align:center;padding:40px 20px">
+      <p style="font-size:36px;margin-bottom:8px">💳</p>
+      <p style="font-size:14px;font-weight:700;margin-bottom:5px">لا توجد محافظ بعد</p>
+      <p style="font-size:12px;color:var(--tx3);margin-bottom:16px">أضف بياناتك البنكية لتجدها دائماً عند الحاجة</p>
+      <button class="btn bp" style="width:auto;padding:10px 24px" onclick="openAddWallet()">+ إضافة محفظة</button>
+    </div>
+  </div>
 </div>
  
 <!-- BOTTOM NAV -->
@@ -496,54 +554,45 @@ input[type=number]{-moz-appearance:textfield}
   <button onclick="openAdd()" style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#F97316,#FB923C);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px #F9731655;transform:translateY(-6px);flex-shrink:0"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
   <button class="ni" id="n-sav" onclick="sv('sav')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="10" ry="10"/><path d="M12 8v4l3 3"/></svg>الصندوق</button>
   <button class="ni" id="n-sum" onclick="sv('sum')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>التقارير</button>
+  <button class="ni" id="n-wal" onclick="sv('wal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M16 12h2"/><path d="M2 10h20"/></svg>محافظ</button>
 </div>
  
 <script>
 const CATS=[{id:"food",lb:"🛒 مأكل ومشرب",cl:"#F97316"},{id:"rent",lb:"🏠 إيجار / رهن",cl:"#3B82F6"},{id:"electricity",lb:"💡 كهرباء ومياه",cl:"#EAB308"},{id:"transport",lb:"🚗 مواصلات",cl:"#10B981"},{id:"health",lb:"💊 صحة وطب",cl:"#EC4899"},{id:"education",lb:"📚 تعليم",cl:"#8B5CF6"},{id:"entertainment",lb:"🎮 ترفيه",cl:"#06B6D4"},{id:"other",lb:"📦 أخرى",cl:"#6B7280"}];
 const MO=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-const _cy=new Date().getFullYear();
-const YRS=Array.from({length:8},(_,i)=>_cy-2+i);
+const YRS=[2026,2027,2028,2029,2030];
  
-let exps=[],incs=[],sav={bal:0,hist:[]},goal=null,dark=true;
-let fM=new Date().getMonth(),fY=new Date().getFullYear(),editId=null,delT=null,actCat="all",actCh="d",curV="dash",fDirty=false,toastTmr=null;
+let exps=[],incs=[],sav={bal:0,hist:[]},goal=null,dark=true,wallets=[];
+let fM=new Date().getMonth(),fY=2026,editId=null,delT=null,actCat="all",actCh="d",curV="dash",fDirty=false,toastTmr=null;
+let walDelTarget=null,walEditId=null,selColor=0;
  
 function sa(){
-  const ts=Date.now();
-  // حفظ محلي فوري كـ backup
   localStorage.setItem("b_exps",JSON.stringify(exps));
   localStorage.setItem("b_incs",JSON.stringify(incs));
   localStorage.setItem("b_sav",JSON.stringify(sav));
   localStorage.setItem("b_goal",JSON.stringify(goal));
   localStorage.setItem("b_dark",JSON.stringify(dark));
-  localStorage.setItem("b_updatedAt",ts);
-  // حفظ Firebase في الخلفية
-  window._localExps=exps;window._localIncs=incs;window._localSav=sav;window._localGoal=goal;window._localDark=dark;
+  localStorage.setItem("b_wallets",JSON.stringify(wallets));
+  window._localExps=exps;window._localIncs=incs;window._localSav=sav;window._localGoal=goal;window._localDark=dark;window._localWallets=wallets;
   if(window.saveToFirestore) window.saveToFirestore();
 }
  
 window.initApp=function(){
-  // حمّل من localStorage أولاً (فوري)
   function ld(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}}
   exps=ld("b_exps",[]);incs=ld("b_incs",[]);
-  sav=ld("b_sav",{bal:0,hist:[]});goal=ld("b_goal",null);dark=ld("b_dark",true);
-  const localTs=ld("b_updatedAt",0);
-  // إذا Firebase عنده بيانات أحدث (بناءً على timestamp)، استخدمها
-  const firebaseTs=window._updatedAt?new Date(window._updatedAt).getTime():0;
-  if(firebaseTs>localTs){
-    if(window._localExps!==undefined) exps=window._localExps;
-    if(window._localIncs!==undefined) incs=window._localIncs;
-    if(window._localSav!==undefined) sav=window._localSav;
-    if(window._localGoal!==undefined) goal=window._localGoal;
-    if(window._localDark!==undefined) dark=window._localDark;
-  }
+  sav=ld("b_sav",{bal:0,hist:[]});goal=ld("b_goal",null);dark=ld("b_dark",true);wallets=ld("b_wallets",[]);
+  if(window._localExps&&window._localExps.length>=exps.length) exps=window._localExps;
+  if(window._localIncs&&window._localIncs.length>=incs.length) incs=window._localIncs;
+  if(window._localSav) sav=window._localSav;
+  if(window._localGoal!==undefined) goal=window._localGoal;
+  if(window._localDark!==undefined) dark=window._localDark;
+  if(window._localWallets&&window._localWallets.length>=wallets.length) wallets=window._localWallets;
   applyTheme();renderAll();
 };
 function f(n){return Number(n).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:2});}
 function gc(id){return CATS.find(c=>c.id===id)||CATS[CATS.length-1];}
 function getF(){return exps.filter(e=>{const d=new Date(e.date);return d.getMonth()===fM&&d.getFullYear()===fY;});}
 function getI(){return incs.filter(i=>i.mo===fM&&i.yr===fY).reduce((s,i)=>s+Number(i.a),0);}
-function getIRegular(){return incs.filter(i=>i.mo===fM&&i.yr===fY&&!i.fromSavings).reduce((s,i)=>s+Number(i.a),0);}
-function getISavings(){return incs.filter(i=>i.mo===fM&&i.yr===fY&&i.fromSavings).reduce((s,i)=>s+Number(i.a),0);}
  
 function applyTheme(){document.body.classList.toggle("lm",!dark);document.getElementById("tbtn").textContent=dark?"🌙":"☀️";setTimeout(()=>drawD(cdData()),150);}
 function toggleTheme(){dark=!dark;sa();applyTheme();}
@@ -685,13 +734,12 @@ function renderAll(){
  
   // ── Income view ──
   const mIncs=incs.filter(i=>i.mo===fM&&i.yr===fY);
-  const incSav=getISavings();
   document.getElementById("iTotal").textContent=inc>0?`الإجمالي: ${f(inc)} ﷼`:"";
-  document.getElementById("iList").innerHTML=mIncs.length?mIncs.map(i=>`<div class="rw" style="margin-bottom:6px"><div style="width:32px;height:32px;border-radius:7px;background:${i.fromSavings?"var(--acg)":"var(--grd)"};display:flex;align-items:center;justify-content:center;font-size:14px">${i.fromSavings?"🏦":"💰"}</div><div style="flex:1"><p style="font-weight:700;font-size:13px">${i.t}${i.fromSavings?` <span style="font-size:9px;color:var(--ac);background:var(--acg);padding:1px 6px;border-radius:4px">من الصندوق</span>`:""}${i.prevDay?` <span style="font-size:9px;color:var(--tx3);text-decoration:line-through;margin-left:2px">يوم ${i.prevDay}</span> ❌`:""} ${i.day?`<span style="font-size:9px;color:var(--bl);background:#3b82f622;padding:1px 6px;border-radius:4px">يوم ${i.day}</span>`:""}</p></div><p style="font-weight:800;font-size:13px;color:var(--gr);margin-left:7px">${f(i.a)} ﷼</p><button class="bi" onclick="editInc(${i.id})">✏️</button><button class="bi" onclick="delInc(${i.id})">🗑️</button></div>`).join(""):`<div style="text-align:center;padding:26px;color:var(--tx4)"><p style="font-size:24px;margin-bottom:5px">💸</p><p style="font-size:12px">لا توجد مصادر دخل</p></div>`;
+  document.getElementById("iList").innerHTML=mIncs.length?mIncs.map(i=>`<div class="rw" style="margin-bottom:6px"><div style="width:32px;height:32px;border-radius:7px;background:var(--grd);display:flex;align-items:center;justify-content:center;font-size:14px">💰</div><div style="flex:1"><p style="font-weight:700;font-size:13px">${i.t}${i.prevDay?` <span style="font-size:9px;color:var(--tx3);text-decoration:line-through;margin-left:2px">يوم ${i.prevDay}</span> ❌`:""} ${i.day?`<span style="font-size:9px;color:var(--bl);background:#3b82f622;padding:1px 6px;border-radius:4px">يوم ${i.day}</span>`:""}</p></div><p style="font-weight:800;font-size:13px;color:var(--gr);margin-left:7px">${f(i.a)} ﷼</p><button class="bi" onclick="editInc(${i.id})">✏️</button><button class="bi" onclick="delInc(${i.id})">🗑️</button></div>`).join(""):`<div style="text-align:center;padding:26px;color:var(--tx4)"><p style="font-size:24px;margin-bottom:5px">💸</p><p style="font-size:12px">لا توجد مصادر دخل</p></div>`;
   if(mIncs.length){
     const net2=inc-tot,sp=inc>0?Math.min((net2/inc)*100,100):0;
     document.getElementById("iSum").classList.remove("hid");
-    document.getElementById("is_i").innerHTML=`${f(inc)} ﷼${incSav>0?` <span style="font-size:10px;color:var(--ac);font-weight:600">(منها ${f(incSav)} من الصندوق)</span>`:""}`;
+    document.getElementById("is_i").textContent=f(inc)+" ﷼";
     document.getElementById("is_e").textContent=f(tot)+" ﷼";
     document.getElementById("is_s").textContent=f(net2)+" ﷼";
     document.getElementById("is_s").style.color=net2>=0?"var(--gr)":"var(--rd)";
@@ -701,6 +749,7 @@ function renderAll(){
   } else{document.getElementById("iSum").classList.add("hid");}
  
   renderSav();
+  renderWallets();
 }
  
 function renderSav(){
@@ -708,7 +757,7 @@ function renderSav(){
   const td=hist.filter(t=>t.tp==="d").reduce((s,t)=>s+t.a,0),tw=hist.filter(t=>t.tp==="w").reduce((s,t)=>s+t.a,0);
   document.getElementById("sv_b").textContent=f(bal);document.getElementById("sv_td").textContent=f(td);document.getElementById("sv_tw").textContent=f(tw);document.getElementById("sv_tc").textContent=hist.length+" معاملة";
   if(goal&&goal.tg>0){document.getElementById("sv_gw").classList.remove("hid");const gp=Math.min((bal/goal.tg)*100,100);document.getElementById("sv_gn").textContent=`هدف: ${goal.nm||"توفير"}`;document.getElementById("sv_gp").textContent=Math.round(gp)+"%";document.getElementById("sv_gb").style.width=gp+"%";document.getElementById("sv_gd").textContent=`${f(bal)} من ${f(goal.tg)} ﷼`;}else{document.getElementById("sv_gw").classList.add("hid");}
-  document.getElementById("sv_h").innerHTML=!hist.length?`<div style="text-align:center;padding:34px;color:var(--tx4)"><p style="font-size:24px;margin-bottom:5px">🏦</p><p style="font-size:12px">لا توجد معاملات بعد</p></div>`:[...hist].reverse().map(t=>`<div class="rw" style="margin-bottom:6px"><div style="width:34px;height:34px;border-radius:8px;background:${t.tp==="d"?"var(--grd)":"var(--rdd)"};display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${t.tp==="d"?"⬆️":"⬇️"}</div><div style="flex:1;min-width:0"><p style="font-weight:700;font-size:13px">${t.rsn||t.src||"—"}${t.lnk?` <span style="font-size:9px;color:var(--yw);background:var(--ywd);padding:1px 5px;border-radius:3px">مصروف</span>`:""}${t.fromIncome?` <span style="font-size:9px;color:var(--gr);background:var(--grd);padding:1px 5px;border-radius:3px">من الدخل</span>`:""}${t.toIncome?` <span style="font-size:9px;color:var(--gr);background:var(--grd);padding:1px 5px;border-radius:3px">للمتبقي ✅</span>`:""}</p><p style="font-size:11px;color:var(--tx3);margin-top:1px">${t.dt}${t.nt?` · ${t.nt}`:""}</p></div><p style="font-weight:800;font-size:13px;color:${t.tp==="d"?"var(--gr)":"var(--rd)"};flex-shrink:0">${t.tp==="d"?"+":"−"}${f(t.a)} ﷼</p><div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0"><button class="bi" onclick="openTxEdit(${t.id})">✏️</button><button class="bi" onclick="askTxDel(${t.id})">🗑️</button></div></div>`).join("");
+  document.getElementById("sv_h").innerHTML=!hist.length?`<div style="text-align:center;padding:34px;color:var(--tx4)"><p style="font-size:24px;margin-bottom:5px">🏦</p><p style="font-size:12px">لا توجد معاملات بعد</p></div>`:[...hist].reverse().map(t=>`<div class="rw" style="margin-bottom:6px"><div style="width:34px;height:34px;border-radius:8px;background:${t.tp==="d"?"var(--grd)":"var(--rdd)"};display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${t.tp==="d"?"⬆️":"⬇️"}</div><div style="flex:1;min-width:0"><p style="font-weight:700;font-size:13px">${t.rsn||t.src||"—"}${t.lnk?` <span style="font-size:9px;color:var(--yw);background:var(--ywd);padding:1px 5px;border-radius:3px">مصروف</span>`:""}${t.fromIncome?` <span style="font-size:9px;color:var(--gr);background:var(--grd);padding:1px 5px;border-radius:3px">من الدخل</span>`:""}</p><p style="font-size:11px;color:var(--tx3);margin-top:1px">${t.dt}${t.nt?` · ${t.nt}`:""}</p></div><p style="font-weight:800;font-size:13px;color:${t.tp==="d"?"var(--gr)":"var(--rd)"};flex-shrink:0">${t.tp==="d"?"+":"−"}${f(t.a)} ﷼</p><div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0"><button class="bi" onclick="openTxEdit(${t.id})">✏️</button><button class="bi" onclick="askTxDel(${t.id})">🗑️</button></div></div>`).join("");
 }
  
 function addInc(){
@@ -720,25 +769,8 @@ function addInc(){
   document.getElementById("iT").value="";document.getElementById("iA").value="";document.getElementById("iDay").value="";
   sa();renderAll();toast("تمت الإضافة ✓");submitting=false;
 }
-let incDelTarget=null;
-function delInc(id){
-  const i=incs.find(x=>x.id===id);
-  if(!i) return;
-  // منع حذف دخل مرتبط بصندوق مباشرة — يُحذف من الصندوق
-  if(i.fromSavings){toast("لحذف هذا، احذف المعاملة من صندوق التوفير","w");return;}
-  incDelTarget=id;
-  os("sIncDel");
-}
-function confirmIncDel(){
-  if(!incDelTarget){cs("sIncDel");return;}
-  incs=incs.filter(i=>i.id!==incDelTarget);
-  incDelTarget=null;sa();cs("sIncDel");renderAll();toast("تم الحذف");
-}
-function editInc(id){
-  const i=incs.find(x=>x.id===id);if(!i)return;
-  if(i.fromSavings){toast("عدّل هذا المبلغ من سجل الصندوق","w");return;}
-  document.getElementById("ie_id").value=id;document.getElementById("ie_t").value=i.t;document.getElementById("ie_a").value=i.a;document.getElementById("ie_day").value=i.day||"";os("sIE");
-}
+function delInc(id){incs=incs.filter(i=>i.id!==id);sa();renderAll();toast("تم الحذف");}
+function editInc(id){const i=incs.find(x=>x.id===id);if(!i)return;document.getElementById("ie_id").value=id;document.getElementById("ie_t").value=i.t;document.getElementById("ie_a").value=i.a;document.getElementById("ie_day").value=i.day||"";os("sIE");}
 function saveIE(){
   const id=Number(document.getElementById("ie_id").value),t=document.getElementById("ie_t").value.trim(),a=Number(document.getElementById("ie_a").value),day=Number(document.getElementById("ie_day").value)||null;
   if(!t||!a||a<=0){toast("تأكد من البيانات","err");return;}
@@ -771,16 +803,7 @@ function saveTxEdit(){
   else sav.bal=(sav.bal||0)+old.a-newA;
   sav.bal=Math.max(0,sav.bal);
   sav.hist=sav.hist.map(x=>x.id===id?{...x,a:newA,rsn:tp==="w"?newR:x.rsn,src:tp==="d"?newR:x.src,nt:newN}:x);
-  // حدّث الدخل المرتبط لو السحب كان "للمتبقي"
-  if(tp==="w"&&old.toIncome){
-    const linked=incs.find(i=>i.fromSavings&&i.a===old.a&&i.t.includes(old.rsn));
-    if(linked) incs=incs.map(i=>i.id===linked.id?{...i,a:newA,t:`من الصندوق: ${newR||old.rsn}`}:i);
-  }
-  // حدّث المصروف المرتبط لو السحب كان "كمصروف"
-  if(tp==="w"&&old.lnk){
-    exps=exps.map(e=>(e.n==="من صندوق التوفير"&&e.a===old.a&&e.t.includes(old.rsn))?{...e,a:newA,t:`سحب من الصندوق: ${newR||old.rsn}`}:e);
-  }
-  sa();cs("sTxEdit");renderAll();toast("تم التعديل ✓");
+  sa();cs("sTxEdit");renderSav();toast("تم التعديل ✓");
 }
 function askTxDel(id){txDelTarget=id;os("sTxDel");}
 function confirmTxDel(){
@@ -788,18 +811,8 @@ function confirmTxDel(){
   // reverse the transaction from balance
   if(t.tp==="d") sav.bal=Math.max(0,(sav.bal||0)-t.a);
   else sav.bal=(sav.bal||0)+t.a;
-  // لو السحب كان "للمتبقي"، احذف الدخل المرتبط
-  if(t.tp==="w"&&t.toIncome){
-    // نبحث عن دخل fromSavings بنفس المبلغ والسبب قريب من تاريخ المعاملة
-    const linked=incs.find(i=>i.fromSavings&&i.a===t.a&&i.t.includes(t.rsn));
-    if(linked) incs=incs.filter(i=>i.id!==linked.id);
-  }
-  // لو السحب كان "كمصروف"، احذف المصروف المرتبط
-  if(t.tp==="w"&&t.lnk){
-    exps=exps.filter(e=>!(e.n==="من صندوق التوفير"&&e.a===t.a&&e.t.includes(t.rsn)));
-  }
   sav.hist=sav.hist.filter(x=>x.id!==txDelTarget);
-  txDelTarget=null;sa();cs("sTxDel");renderAll();toast("تم الحذف وتم تحديث الرصيد");
+  txDelTarget=null;sa();cs("sTxDel");renderSav();toast("تم الحذف وتم تحديث الرصيد");
 }
  
 function doDeposit(){
@@ -810,37 +823,17 @@ function doDeposit(){
   document.getElementById("dp_a").value="";document.getElementById("dp_s").value="";document.getElementById("dp_n").value="";document.getElementById("dp_fromInc").checked=false;
   sa();cs("sDp");renderAll();toast("تم الإيداع ✓");submitting=false;
 }
-function wdOptChange(){
-  const val=document.querySelector('input[name="wd_dest"]:checked').value;
-  document.getElementById("wd_cat").classList.toggle("hid",val!=="expense");
-  // highlight selected option
-  ["none","inc","exp"].forEach(k=>{
-    const lbl=document.getElementById("wd_opt_"+k+"_lbl");
-    if(lbl) lbl.style.borderColor=document.getElementById("wd_opt_"+k).checked?"var(--ac)":"var(--bd2)";
-  });
-}
 function doWithdraw(){
   if(submitting) return;submitting=true;
-  const a=Number(document.getElementById("wd_a").value),rsn=document.getElementById("wd_r").value.trim();
-  const dest=document.querySelector('input[name="wd_dest"]:checked').value;
-  const cat=document.getElementById("wd_c").value;
+  const a=Number(document.getElementById("wd_a").value),rsn=document.getElementById("wd_r").value.trim(),addE=document.getElementById("wd_exp").checked,cat=document.getElementById("wd_c").value;
   if(!a||a<=0){toast("أدخل مبلغاً صحيحاً","err");submitting=false;return;}
   if(a>(sav.bal||0)){toast(`الرصيد غير كافٍ — رصيدك: ${f(sav.bal||0)} ﷼`,"err");submitting=false;return;}
   if(!rsn){toast("أدخل سبب السحب","err");submitting=false;return;}
   sav.bal=(sav.bal||0)-a;
-  const addE=dest==="expense", toInc=dest==="income";
-  sav.hist.push({id:Date.now(),tp:"w",a,rsn,dt:new Date().toISOString().split("T")[0],lnk:addE,toIncome:toInc});
-  if(addE){
-    exps.unshift({id:Date.now()+1,t:`سحب من الصندوق: ${rsn}`,a,cat,date:new Date().toISOString().split("T")[0],n:"من صندوق التوفير",rec:false});
-  }
-  if(toInc){
-    incs.push({id:Date.now()+2,t:`من الصندوق: ${rsn}`,a,mo:fM,yr:fY,day:null,fromSavings:true});
-  }
-  document.getElementById("wd_a").value="";document.getElementById("wd_r").value="";
-  document.querySelector('input[name="wd_dest"][value="none"]').checked=true;wdOptChange();
-  sa();cs("sWd");renderAll();
-  toast(toInc?"تم السحب وأُضيف للمتبقي ✓":addE?"تم السحب وسُجّل كمصروف ✓":"تم السحب ✓");
-  submitting=false;
+  sav.hist.push({id:Date.now(),tp:"w",a,rsn,dt:new Date().toISOString().split("T")[0],lnk:addE});
+  if(addE){exps.unshift({id:Date.now()+1,t:`سحب من الصندوق: ${rsn}`,a,cat,date:new Date().toISOString().split("T")[0],n:"من صندوق التوفير",rec:false});}
+  document.getElementById("wd_a").value="";document.getElementById("wd_r").value="";document.getElementById("wd_exp").checked=false;document.getElementById("wd_cat").classList.add("hid");
+  sa();cs("sWd");renderAll();toast("تم السحب ✓");submitting=false;
 }
 function saveGoal(){const n=document.getElementById("gl_n").value.trim(),t=Number(document.getElementById("gl_t").value);if(t>0)goal={nm:n||"توفير",tg:t};sa();cs("sGoal");renderSav();toast("تم حفظ الهدف ✓");}
 function clearGoal(){goal=null;sa();cs("sGoal");renderSav();toast("تم مسح الهدف");}
@@ -851,12 +844,6 @@ function openAdd(){
   const now=new Date();bldDS(fY,fM,now.getDate());
   document.getElementById("fN").value="";
   document.getElementById("fmTitle").textContent="إضافة مصروف";document.getElementById("fBtn").textContent="✅ إضافة المصروف";
-  // track any change in the form
-  ["fT","fA","fC","fDy","fMo","fYr","fN"].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.addEventListener("input",()=>fDirty=true,{once:false});
-    if(el) el.addEventListener("change",()=>fDirty=true,{once:false});
-  });
   sv("add");
 }
 function startEdit(id){
@@ -865,11 +852,6 @@ function startEdit(id){
   const d=new Date(e.date);bldDS(d.getFullYear(),d.getMonth(),d.getDate());
   document.getElementById("fN").value=e.n||"";
   document.getElementById("fmTitle").textContent="تعديل المصروف";document.getElementById("fBtn").textContent="💾 حفظ التعديلات";
-  ["fT","fA","fC","fDy","fMo","fYr","fN"].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.addEventListener("input",()=>fDirty=true,{once:false});
-    if(el) el.addEventListener("change",()=>fDirty=true,{once:false});
-  });
   sv("add");
 }
 let submitting=false;
@@ -883,18 +865,17 @@ function subForm(){
   fDirty=false;sa();editId=null;submitting=false;sv("dash");
 }
 function goBack(){
-  const hasContent=document.getElementById("fT").value.trim()||document.getElementById("fA").value;
-  if(fDirty||hasContent){if(!confirm("بياناتك غير محفوظة، تبي ترجع؟"))return;}
-  editId=null;fDirty=false;sv("dash");
+  if(fDirty&&(document.getElementById("fT").value||document.getElementById("fA").value)){if(!confirm("بياناتك غير محفوظة، تبي ترجع؟"))return;}
+  editId=null;sv("dash");
 }
 function askDel(id){delT=id;os("sDelete");}
 function confirmDelete(){exps=exps.filter(e=>e.id!==delT);sa();cs("sDelete");toast("تم الحذف");renderAll();}
  
 function sv(v){
   curV=v;
-  const map={dash:"vDash",add:"vAdd",inc:"vInc",sav:"vSav",sum:"vSum"};
+  const map={dash:"vDash",add:"vAdd",inc:"vInc",sav:"vSav",sum:"vSum",wal:"vWal"};
   Object.entries(map).forEach(([k,id])=>document.getElementById(id).classList.toggle("hid",k!==v));
-  ["dash","inc","sav","sum"].forEach(n=>{const el=document.getElementById("n-"+n);if(el)el.classList.toggle("on",n===v);});
+  ["dash","inc","sav","sum","wal"].forEach(n=>{const el=document.getElementById("n-"+n);if(el)el.classList.toggle("on",n===v);});
   if(v!=="add")renderAll();
 }
  
@@ -912,11 +893,158 @@ function expJSON(){
 }
 function impJSON(e){
   const file=e.target.files[0];if(!file)return;
-  const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.exps)exps=d.exps;if(d.incs)incs=d.incs;if(d.sav)sav=d.sav;if(d.goal!==undefined)goal=d.goal;sa();cs("sExport");renderAll();toast("تم الاستيراد ✓");}catch{toast("ملف غير صالح","err");}};r.readAsText(file);e.target.value="";
+  const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.exps)exps=d.exps;if(d.incs)incs=d.incs;if(d.sav)sav=d.sav;if(d.goal!==undefined)goal=d.goal;if(d.wallets)wallets=d.wallets;sa();cs("sExport");renderAll();toast("تم الاستيراد ✓");}catch{toast("ملف غير صالح","err");}};r.readAsText(file);e.target.value="";
+}
+
+// ══ WALLET FUNCTIONS ══
+const WAL_GRADS=[
+  "linear-gradient(135deg,#F97316,#FB923C)",
+  "linear-gradient(135deg,#3B82F6,#6366F1)",
+  "linear-gradient(135deg,#10B981,#059669)",
+  "linear-gradient(135deg,#EC4899,#BE185D)",
+  "linear-gradient(135deg,#8B5CF6,#7C3AED)",
+  "linear-gradient(135deg,#1E293B,#334155)"
+];
+
+function fmtIban(inp){
+  let v=inp.value.replace(/\s/g,"").toUpperCase();
+  let out="";for(let i=0;i<v.length;i++){if(i>0&&i%4===0)out+=" ";out+=v[i];}
+  inp.value=out;
+}
+
+function selClr(el){
+  document.querySelectorAll(".walClr").forEach(e=>e.style.border="2px solid transparent");
+  el.style.border="2px solid var(--ac)";selColor=Number(el.dataset.c);
+}
+
+function openAddWallet(){
+  walEditId=null;selColor=0;
+  document.getElementById("walShTitle").textContent="💳 إضافة محفظة";
+  document.getElementById("walSaveBtn").textContent="💾 حفظ المحفظة";
+  ["wal_id","wal_bank","wal_name","wal_acc","wal_iban","wal_swift","wal_note"].forEach(id=>document.getElementById(id).value="");
+  document.querySelectorAll(".walClr").forEach((e,i)=>e.style.border=i===0?"2px solid var(--ac)":"2px solid transparent");
+  selColor=0;os("sWal");
+}
+
+function editWallet(id){
+  const w=wallets.find(x=>x.id===id);if(!w)return;
+  walEditId=id;selColor=w.clr||0;
+  document.getElementById("walShTitle").textContent="✏️ تعديل المحفظة";
+  document.getElementById("walSaveBtn").textContent="💾 حفظ التعديلات";
+  document.getElementById("wal_id").value=id;
+  document.getElementById("wal_bank").value=w.bank||"";
+  document.getElementById("wal_name").value=w.name||"";
+  document.getElementById("wal_acc").value=w.acc||"";
+  document.getElementById("wal_iban").value=w.iban||"";
+  document.getElementById("wal_swift").value=w.swift||"";
+  document.getElementById("wal_note").value=w.note||"";
+  document.querySelectorAll(".walClr").forEach((e,i)=>e.style.border=i===selColor?"2px solid var(--ac)":"2px solid transparent");
+  os("sWal");
+}
+
+function saveWallet(){
+  const bank=document.getElementById("wal_bank").value.trim();
+  if(!bank){toast("أدخل اسم البنك","err");return;}
+  const w={
+    id:walEditId||Date.now(),
+    bank,name:document.getElementById("wal_name").value.trim(),
+    acc:document.getElementById("wal_acc").value.trim(),
+    iban:document.getElementById("wal_iban").value.trim(),
+    swift:document.getElementById("wal_swift").value.trim(),
+    note:document.getElementById("wal_note").value.trim(),
+    clr:selColor
+  };
+  if(walEditId){wallets=wallets.map(x=>x.id===walEditId?w:x);toast("تم التعديل ✓");}
+  else{wallets.push(w);toast("تمت الإضافة ✓");}
+  sa();cs("sWal");renderWallets();
+}
+
+function askWalDel(id){walDelTarget=id;os("sWalDel");}
+function confirmWalDel(){
+  wallets=wallets.filter(x=>x.id!==walDelTarget);
+  walDelTarget=null;sa();cs("sWalDel");renderWallets();toast("تم الحذف");
+}
+
+function cpTxt(txt,lbl){
+  navigator.clipboard.writeText(txt).then(()=>toast(`تم نسخ ${lbl} ✓`)).catch(()=>{
+    const ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);toast(`تم نسخ ${lbl} ✓`);
+  });
+}
+
+function viewWallet(id){
+  const w=wallets.find(x=>x.id===id);if(!w)return;
+  const grad=WAL_GRADS[w.clr||0];
+  const row=(lbl,val,cpLbl)=>val?`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--bd)">
+      <span style="font-size:11px;color:var(--tx3);font-weight:600">${lbl}</span>
+      <div style="display:flex;align-items:center;gap:7px">
+        <span style="font-size:13px;font-weight:700;direction:ltr">${val}</span>
+        ${cpLbl?`<button class="bi" onclick="cpTxt('${val.replace(/\s/g,'')}','${cpLbl}')" title="نسخ">📋</button>`:""}
+      </div>
+    </div>`:"";
+  document.getElementById("walViewContent").innerHTML=`
+    <div style="background:${grad};border-radius:14px;padding:20px;margin-bottom:16px;position:relative;overflow:hidden;min-height:100px">
+      <div style="position:absolute;top:-20px;right:-20px;width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.08)"></div>
+      <div style="position:absolute;bottom:-30px;left:-10px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.06)"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;position:relative">
+        <div>
+          <p style="font-size:11px;opacity:0.75;margin-bottom:3px;font-weight:600;color:#fff">البنك</p>
+          <p style="font-size:18px;font-weight:900;color:#fff">${w.bank}</p>
+          ${w.name?`<p style="font-size:12px;opacity:0.8;color:#fff;margin-top:2px">${w.name}</p>`:""}
+        </div>
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M16 12h2"/><path d="M2 10h20"/></svg>
+      </div>
+      ${w.acc?`<p style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);margin-top:14px;letter-spacing:1px;font-family:monospace">${w.acc}</p>`:""}
+    </div>
+    <div style="padding:0 2px">
+      ${row("رقم الحساب",w.acc,"رقم الحساب")}
+      ${row("رقم الآيبان (IBAN)",w.iban,"الآيبان")}
+      ${row("سويفت كود (SWIFT)",w.swift,"السويفت كود")}
+      ${w.note?`<div style="padding:11px 0"><span style="font-size:11px;color:var(--tx3);font-weight:600">ملاحظة</span><p style="font-size:13px;color:var(--tx2);margin-top:3px">${w.note}</p></div>`:""}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn bp" style="flex:1;padding:10px" onclick="cs('sWalView');editWallet(${w.id})">✏️ تعديل</button>
+      <button class="btn bg" style="flex:0 0 44px;padding:10px" onclick="cs('sWalView');askWalDel(${w.id})">🗑️</button>
+    </div>
+  `;
+  os("sWalView");
+}
+
+function renderWallets(){
+  const list=document.getElementById("walList");
+  const empty=document.getElementById("walEmpty");
+  if(!wallets.length){list.innerHTML="";empty.style.display="block";return;}
+  empty.style.display="none";
+  list.innerHTML=wallets.map(w=>{
+    const grad=WAL_GRADS[w.clr||0];
+    return`<div style="border-radius:var(--r);overflow:hidden;margin-bottom:10px;cursor:pointer" onclick="viewWallet(${w.id})">
+      <div style="background:${grad};padding:16px;position:relative;overflow:hidden">
+        <div style="position:absolute;top:-15px;right:-15px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.08)"></div>
+        <div style="position:absolute;bottom:-20px;left:-10px;width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,0.06)"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;position:relative">
+          <div>
+            <p style="font-size:10px;opacity:0.7;font-weight:600;margin-bottom:2px;color:#fff">البنك</p>
+            <p style="font-size:16px;font-weight:900;color:#fff">${w.bank}</p>
+            ${w.name?`<p style="font-size:11px;opacity:0.75;color:#fff;margin-top:1px">${w.name}</p>`:""}
+          </div>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M16 12h2"/><path d="M2 10h20"/></svg>
+        </div>
+        ${w.acc?`<p style="font-size:12px;opacity:0.8;color:#fff;margin-top:10px;font-family:monospace">${w.acc}</p>`:""}
+      </div>
+      <div style="background:var(--sf);border:1px solid var(--bd);border-top:none;border-radius:0 0 var(--r) var(--r);padding:10px 14px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        ${w.iban?`<div style="display:flex;align-items:center;gap:5px" onclick="event.stopPropagation();cpTxt('${w.iban.replace(/\s/g,'')}','الآيبان')"><span style="font-size:10px;color:var(--tx3);font-weight:600">IBAN</span><span style="font-size:11px;font-weight:700;direction:ltr;font-family:monospace">${w.iban}</span><span style="font-size:11px">📋</span></div>`:""}
+        ${w.swift?`<div style="display:flex;align-items:center;gap:5px" onclick="event.stopPropagation();cpTxt('${w.swift}','السويفت كود')"><span style="font-size:10px;color:var(--tx3);font-weight:600">SWIFT</span><span style="font-size:11px;font-weight:700;font-family:monospace">${w.swift}</span><span style="font-size:11px">📋</span></div>`:""}
+        ${!w.iban&&!w.swift?`<p style="font-size:11px;color:var(--tx4)">اضغط لعرض التفاصيل</p>`:""}
+        <div style="margin-right:auto;display:flex;gap:5px">
+          <button class="bi" onclick="event.stopPropagation();editWallet(${w.id})" style="font-size:13px">✏️</button>
+          <button class="bi" onclick="event.stopPropagation();askWalDel(${w.id})" style="font-size:13px">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
 }
  
 </script>
 </body>
 </html>
- 
  
