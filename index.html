@@ -10,7 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, browserLocalPersistence, setPersistence } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
  
 const firebaseConfig = {
@@ -25,6 +25,7 @@ const firebaseConfig = {
  
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+await setPersistence(auth, browserLocalPersistence).catch(()=>{});
 const db = getFirestore(app);
 let currentUser = null;
  
@@ -84,11 +85,16 @@ window.doSignOut = async function(){
 };
  
 onAuthStateChanged(auth, async (user) => {
+  // أخفِ شاشة التحميل دايماً بعد ما يتحدد الـ auth state
+  const ls=document.getElementById("loadScreen");
+  const lb=document.getElementById("loadBar");
+  if(lb)lb.style.width="60%";
   if(user){
     currentUser = user;
     document.getElementById("userName").textContent = user.displayName || user.email;
     document.getElementById("userAvatar").src = user.photoURL || "";
     document.getElementById("userAvatar").classList.toggle("hid", !user.photoURL);
+    if(lb)lb.style.width="90%";
     await loadFromFirestore(user.uid);
     if(window._exps !== undefined) window._localExps = window._exps;
     if(window._incs !== undefined) window._localIncs = window._incs;
@@ -96,9 +102,12 @@ onAuthStateChanged(auth, async (user) => {
     if(window._goal !== undefined) window._localGoal = window._goal;
     if(window._dark !== undefined) window._localDark = window._dark;
     if(window._wallets !== undefined) window._localWallets = window._wallets;
+    if(lb)lb.style.width="100%";
+    setTimeout(()=>{if(ls)ls.style.display="none";},300);
     hideAuthScreen();
     if(window.initApp) window.initApp();
   } else {
+    if(ls)ls.style.display="none";
     currentUser = null;
     showAuthScreen();
   }
@@ -186,6 +195,7 @@ input[type=number]{-moz-appearance:textfield}
   </div>
 </div>
  
+<div id="loadScreen" style="position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:998;flex-direction:column;gap:12px"><p style="font-size:32px">🏡</p><p style="font-size:13px;color:var(--tx3)">جاري تحميل بياناتك...</p><div style="width:40px;height:4px;background:var(--bd);border-radius:2px;overflow:hidden"><div id="loadBar" style="height:100%;width:0%;background:var(--ac);border-radius:2px;transition:width 1.5s ease;"></div></div></div>
 <div id="toast" class="toast hid"></div>
 <div id="appWrap" class="hid">
  
