@@ -608,12 +608,12 @@ window.initApp=function(){
   function ld(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}}
   exps=ld("b_exps",[]);incs=ld("b_incs",[]);
   sav=ld("b_sav",{bal:0,hist:[]});goal=ld("b_goal",null);dark=ld("b_dark",true);wallets=ld("b_wallets",[]);
-  if(window._localExps&&window._localExps.length>=exps.length) exps=window._localExps;
-  if(window._localIncs&&window._localIncs.length>=incs.length) incs=window._localIncs;
-  if(window._localSav) sav=window._localSav;
+  if(window._localExps!==undefined) exps=window._localExps;
+  if(window._localIncs!==undefined) incs=window._localIncs;
+  if(window._localSav!==undefined) sav=window._localSav;
   if(window._localGoal!==undefined) goal=window._localGoal;
   if(window._localDark!==undefined) dark=window._localDark;
-  if(window._localWallets&&window._localWallets.length>=wallets.length) wallets=window._localWallets;
+  if(window._localWallets!==undefined) wallets=window._localWallets;
   applyTheme();renderAll();
 };
  
