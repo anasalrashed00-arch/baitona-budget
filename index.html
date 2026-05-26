@@ -395,6 +395,7 @@ input[type=number]{-moz-appearance:textfield}
     <img id="userAvatar" src="" class="hid" style="width:28px;height:28px;border-radius:50%;object-fit:cover"/>
     <span id="userName" style="font-size:11px;color:var(--tx3);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
     <button onclick="os('sExport')" style="background:none;border:none;cursor:pointer;font-size:16px;padding:4px">📤</button>
+    <button onclick="sv('sum')" id="n-sum" style="background:none;border:none;cursor:pointer;font-size:16px;padding:4px" title="التقارير">📊</button>
     <button onclick="toggleTheme()" style="background:none;border:none;cursor:pointer;font-size:16px;padding:4px" id="tbtn">🌙</button>
     <button onclick="doSignOut()" style="background:none;border:none;cursor:pointer;font-size:14px;padding:4px" title="تسجيل خروج">🚪</button>
   </div>
@@ -553,7 +554,6 @@ input[type=number]{-moz-appearance:textfield}
   <button class="ni" id="n-inc" onclick="sv('inc')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>الدخل</button>
   <button onclick="openAdd()" style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#F97316,#FB923C);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px #F9731655;transform:translateY(-6px);flex-shrink:0"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
   <button class="ni" id="n-sav" onclick="sv('sav')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="10" ry="10"/><path d="M12 8v4l3 3"/></svg>الصندوق</button>
-  <button class="ni" id="n-sum" onclick="sv('sum')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>التقارير</button>
   <button class="ni" id="n-wal" onclick="sv('wal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M16 12h2"/><path d="M2 10h20"/></svg>محافظ</button>
 </div>
  
@@ -875,7 +875,8 @@ function sv(v){
   curV=v;
   const map={dash:"vDash",add:"vAdd",inc:"vInc",sav:"vSav",sum:"vSum",wal:"vWal"};
   Object.entries(map).forEach(([k,id])=>document.getElementById(id).classList.toggle("hid",k!==v));
-  ["dash","inc","sav","sum","wal"].forEach(n=>{const el=document.getElementById("n-"+n);if(el)el.classList.toggle("on",n===v);});
+  ["dash","inc","sav","wal"].forEach(n=>{const el=document.getElementById("n-"+n);if(el)el.classList.toggle("on",n===v);});
+  const sumBtn=document.getElementById("n-sum");if(sumBtn)sumBtn.style.color=v==="sum"?"var(--ac)":"";
   if(v!=="add")renderAll();
 }
  
@@ -1047,4 +1048,5 @@ function renderWallets(){
 </script>
 </body>
 </html>
+ 
  
